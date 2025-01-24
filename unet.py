@@ -35,58 +35,39 @@ class UNetRadio2D(nn.Module):
         self.encoder = nn.ModuleList()
         self.decoder = nn.ModuleList()
 
-        for index in range(self.depth):
-            # Calculate padding to ensure 2^n shape
-            padding = self.calculate_padding(kernel_size, stride)
-
-            # Encoder
+        for _ in range(self.depth):
+            # Encoder with padding to ensure consistent shapes
             self.encoder.append(
                 nn.Sequential(
-                    nn.Conv2d(in_channels, mid_channels, kernel_size=kernel_size, stride=stride, padding=padding),
+                    nn.Conv2d(in_channels, mid_channels, kernel_size=kernel_size, stride=stride, padding=(1, 1)),
                     nn.ReLU(),
                     nn.Conv2d(mid_channels, mid_channels, kernel_size=1, stride=1, padding=0),
                     nn.ReLU(),
                 )
             )
 
-            # Decoder
+            # Decoder with padding
             self.decoder.insert(
                 0,
                 nn.Sequential(
                     nn.Conv2d(mid_channels, mid_channels, kernel_size=1, stride=1, padding=0),
                     nn.ReLU(),
-                    nn.ConvTranspose2d(mid_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding),
-                    nn.ReLU() if index > 0 else nn.Identity(),
+                    nn.ConvTranspose2d(mid_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=(1, 1)),
+                    nn.ReLU(),
                 )
             )
 
             in_channels = mid_channels
             mid_channels = min(int(growth * mid_channels), max_channels)
 
-        self.attention = None
-        if config['unet']['attention']:
-            self.attention = TFEncoder(
-                dim=in_channels * config['unet']['feature_dim'], 
-                n_layers=config['unet']['n_layers'], 
-                n_heads=config['unet']['n_heads']
-            )
-
-        self.final_fc = nn.Linear(config['unet']['final_mel_dim'], config['unet']['input_mel_dim']) if config['unet']['final_mel_dim'] != config['unet']['input_mel_dim'] else None
-
-    @staticmethod
-    def calculate_padding(kernel_size, stride):
-        """
-        Calculate padding to ensure output dimensions are divisible by stride.
-        """
-        padding_h = (stride[0] - 1 + kernel_size[0]) // 2
-        padding_w = (stride[1] - 1 + kernel_size[1]) // 2
-        return (padding_h, padding_w)
+        self.final_fc = nn.Linear(
+            config['unet']['final_mel_dim'], config['unet']['input_mel_dim']
+        ) if config['unet']['final_mel_dim'] != config['unet']['input_mel_dim'] else None
 
     def forward(self, x):
-        # Adjust input shape to (batch, channels, features, time)
         if x.dim() < 4:
             x = rearrange(x, 'b (c f) t -> b c f t', c=1)
-        
+
         skip_connections = []
 
         # Encoder
@@ -94,16 +75,16 @@ class UNetRadio2D(nn.Module):
             x = encode(x)
             skip_connections.append(x)
 
-        # Attention
-        if self.attention:
-            b, c, f, t = x.shape
-            x = rearrange(x, 'b c f t -> b t (c f)')
-            x = self.attention(x)
-            x = rearrange(x, 'b t (c f) -> b c f t')
-
         # Decoder
         for decode in self.decoder:
             skip = skip_connections.pop()
+
+            # Ensure the shapes match for skip connection
+            if skip.size() != x.size():
+                diff_h = skip.size(2) - x.size(2)
+                diff_w = skip.size(3) - x.size(3)
+                x = nn.functional.pad(x, (0, diff_w, 0, diff_h))
+
             x = decode(x + skip)
 
         # Final fully connected layer
