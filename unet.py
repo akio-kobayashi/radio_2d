@@ -28,100 +28,92 @@ class UNetRadio2D(nn.Module):
         mid_channels = config['unet']['mid_channels']
         out_channels = config['unet']['out_channels']
         max_channels = config['unet']['max_channels']
-        self.kernel_size = config['unet']['kernel_size']  # (height, width)
+        kernel_size = config['unet']['kernel_size']
+        stride = config['unet']['stride']
         growth = config['unet']['growth']
-        self.stride = config['unet']['stride']  # (height_stride, width_stride)
-        self.padding = config['unet'].get('padding', (0, 0))  # 明示的にパディングを指定
-        reference = config['unet']['reference']
 
         self.encoder = nn.ModuleList()
         self.decoder = nn.ModuleList()
-        feature_dim = config['unet']['feature_dim']
 
         for index in range(self.depth):
-            encode = nn.ModuleList()
-            encode.append(
-                nn.Conv2d(
-                    in_channels,
-                    mid_channels,
-                    kernel_size=self.kernel_size,
-                    stride=self.stride,
-                    padding=self.padding,
+            # Calculate padding to ensure 2^n shape
+            padding = self.calculate_padding(kernel_size, stride)
+
+            # Encoder
+            self.encoder.append(
+                nn.Sequential(
+                    nn.Conv2d(in_channels, mid_channels, kernel_size=kernel_size, stride=stride, padding=padding),
+                    nn.ReLU(),
+                    nn.Conv2d(mid_channels, mid_channels, kernel_size=1, stride=1, padding=0),
+                    nn.ReLU(),
                 )
             )
-            encode.append(nn.ReLU())
-            encode.append(
-                nn.Conv2d(mid_channels, mid_channels, kernel_size=1, stride=1)
-            )
-            encode.append(nn.ReLU())
-            self.encoder.append(nn.Sequential(*encode))
-            
-            decode = nn.ModuleList()
-            decode.append(
-                nn.Conv2d(mid_channels, mid_channels, kernel_size=1, stride=1)
-            )
-            decode.append(nn.ReLU())
-            decode.append(
-                nn.ConvTranspose2d(
-                    mid_channels,
-                    out_channels,
-                    kernel_size=self.kernel_size,
-                    stride=self.stride,
-                    padding=self.padding,
+
+            # Decoder
+            self.decoder.insert(
+                0,
+                nn.Sequential(
+                    nn.Conv2d(mid_channels, mid_channels, kernel_size=1, stride=1, padding=0),
+                    nn.ReLU(),
+                    nn.ConvTranspose2d(mid_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding),
+                    nn.ReLU() if index > 0 else nn.Identity(),
                 )
             )
-            if index > 0:
-                decode.append(nn.ReLU())
-            self.decoder.insert(0, nn.Sequential(*decode))
-            
-            out_channels = mid_channels
+
             in_channels = mid_channels
             mid_channels = min(int(growth * mid_channels), max_channels)
 
         self.attention = None
         if config['unet']['attention']:
-            # TFEncoder: channels * feature_dim を d_model として渡す
-            self.attention = TFEncoder(in_channels * feature_dim, 
-                                       n_layers=config['unet']['n_layers'], 
-                                       n_heads=config['unet']['n_heads'])
+            self.attention = TFEncoder(
+                dim=in_channels * config['unet']['feature_dim'], 
+                n_layers=config['unet']['n_layers'], 
+                n_heads=config['unet']['n_heads']
+            )
 
-        self.final_fc = None
-        if config['unet']['final_mel_dim'] != config['unet']['input_mel_dim']:
-            self.final_fc = nn.Linear(config['unet']['final_mel_dim'], config['unet']['input_mel_dim'])
+        self.final_fc = nn.Linear(config['unet']['final_mel_dim'], config['unet']['input_mel_dim']) if config['unet']['final_mel_dim'] != config['unet']['input_mel_dim'] else None
+
+    @staticmethod
+    def calculate_padding(kernel_size, stride):
+        """
+        Calculate padding to ensure output dimensions are divisible by stride.
+        """
+        padding_h = (stride[0] - 1 + kernel_size[0]) // 2
+        padding_w = (stride[1] - 1 + kernel_size[1]) // 2
+        return (padding_h, padding_w)
 
     def forward(self, x):
-        # x: (batch, feature, time)
-        if x.dim() < 3:
-            x = rearrange(x, 'b (c f) t -> b c f t', c=1) 
-        # x: (batch, channels, feature, time)
+        # Adjust input shape to (batch, channels, features, time)
+        if x.dim() < 4:
+            x = rearrange(x, 'b (c f) t -> b c f t', c=1)
+        
         skip_connections = []
 
-        # Encoder pass
+        # Encoder
         for encode in self.encoder:
-            x = encode(x)  # 2Dエンコード
+            x = encode(x)
             skip_connections.append(x)
 
-        # Attention module
+        # Attention
         if self.attention:
             b, c, f, t = x.shape
             x = rearrange(x, 'b c f t -> b t (c f)')
-            #x = x.permute(0, 3, 1, 2).reshape(b, t, c * f)  # (batch, time, d_model)
-            x = self.attention(x)  # TFEncoder expects (batch, seq_len, d_model)
+            x = self.attention(x)
             x = rearrange(x, 'b t (c f) -> b c f t')
-            #x = x.view(b, t, c, f).permute(0, 2, 3, 1)  # (batch, channels, feature, time)
 
-        # Decoder pass
+        # Decoder
         for decode in self.decoder:
             skip = skip_connections.pop()
-            x = decode(x + skip)  # Skip connection and decode
+            x = decode(x + skip)
 
+        # Final fully connected layer
         if self.final_fc:
             x = rearrange(x, 'b c f t -> b c t f')
             x = self.final_fc(x)
             x = rearrange(x, 'b c t f -> b c f t')
 
         return x
-
+    
 if __name__ == '__main__':
     # Config for UNetRadio2D
     config = {
