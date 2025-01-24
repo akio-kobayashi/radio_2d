@@ -57,6 +57,7 @@ class UNetRadio2D(nn.Module):
                 )
             )
 
+            out_channels = mid_channels
             in_channels = mid_channels
             mid_channels = min(int(growth * mid_channels), max_channels)
 
@@ -107,7 +108,7 @@ if __name__ == '__main__':
             'mid_channels': 16,
             'out_channels': 1,
             'max_channels': 64,
-            'kernel_size': (3, 3),
+            'kernel_size': (4, 4),
             'growth': 2,
             'rescale': False,
             'stride': (2, 2),
@@ -118,12 +119,12 @@ if __name__ == '__main__':
             'causal': False,
             'n_layers': 3,
             'n_heads': 8,
-            'input_mel_dim': 256,
+            'input_mel_dim': 160,
             'final_mel_dim': 80
         }
     }
     model = UNetRadio2D(config)
-    x = torch.randn(1, 256, 256)
+    x = torch.randn(1, 160, 256)
     y = model(x)
     print(x.shape)
     print(y.shape) # (1, 80, 256) expected
