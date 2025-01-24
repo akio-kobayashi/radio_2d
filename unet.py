@@ -62,7 +62,7 @@ class UNetRadio2D(nn.Module):
             mid_channels = min(int(growth * mid_channels), max_channels)
 
         self.final_fc = nn.Linear(
-            config['unet']['final_mel_dim'], config['unet']['input_mel_dim']
+            config['unet']['input_mel_dim'], config['unet']['final_mel_dim']
         ) if config['unet']['final_mel_dim'] != config['unet']['input_mel_dim'] else None
 
     def forward(self, x):
@@ -81,10 +81,10 @@ class UNetRadio2D(nn.Module):
             skip = skip_connections.pop()
 
             # Ensure the shapes match for skip connection
-            if skip.size() != x.size():
-                diff_h = skip.size(2) - x.size(2)
-                diff_w = skip.size(3) - x.size(3)
-                x = nn.functional.pad(x, (0, diff_w, 0, diff_h))
+            #if skip.size() != x.size():
+            #    diff_h = skip.size(2) - x.size(2)
+            #    diff_w = skip.size(3) - x.size(3)
+            #    x = nn.functional.pad(x, (0, diff_w, 0, diff_h))
 
             x = decode(x + skip)
 
