@@ -78,10 +78,12 @@ def load_mean_var(path):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu") 
 
     npz = np.load(path)
-    mean = torch.from_numpy(npz['mean']).to(device)
-    var = torch.from_numpy(npz['var']).to(device)
+    input_mean = torch.from_numpy(npz['input_mean']).to(device)
+    input_var = torch.from_numpy(npz['input_var']).to(device)
+    output_mean = torch.from_numpy(npz['output_mean']).to(device)
+    output_var = torch.from_numpy(npz['output_var']).to(device)
 
-    return mean, var
+    return input_mean, input_var, output_mean, output_var
 
 def remove_short_long_features(df, min_frames=200, max_frames=2500):
     for idx, row in df:

@@ -1,7 +1,7 @@
 import torch
 from einops import rearrange
 
-def negentropy(x, G=torch.log(torch.cosh)):
+def negentropy(x, G):
     """
     Compute an approximation of negentropy for a batch of tensors.
     

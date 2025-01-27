@@ -1,11 +1,13 @@
 # data
-train_path: ./train.csv
-valid_path: ./valid.csv
-stat_path: ./stats.npz
+train_path: ./ak_train.csv
+valid_path: ./ak_valid.csv
+stat_path: ./ak_stats.npz
 batch_size: 64
 epochs: 200
 n_samples: 10000 &shared_n_samples
 lambda_negentropy: 1.0
+num_frames: 256
+max_mask_len: 32
 
 # process
 process:

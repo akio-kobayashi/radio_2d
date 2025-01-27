@@ -2,7 +2,7 @@ import torch
 import pytorch_lightning as pl
 from lightning.pytorch.loggers import TensorBoardLogger
 import torch.utils.data as data
-from solver import LitGAN
+from solver import LitDAE
 import torch.utils.data as dat
 import torch.multiprocessing as mp
 from speech_dataset import SpeechDataset
@@ -15,7 +15,7 @@ warnings.filterwarnings('ignore')
 
 def main(args, config:dict):
 
-    model = LitGAN(config)
+    model = LitDAE(config)
     
 
     # csv_path, spk_path, stat_path:str, n_frames, max_mask_len, shuffle_data=True       

@@ -99,6 +99,6 @@ class LitDAE(pl.LightningModule):
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(),
                                      **self.config['optimizer'])
-        scheduler = CustomLRScheduler(optimizer, **self.config['scheduler'])
-        return [optimizer], [scheduler]
+        #scheduler = CustomLRScheduler(optimizer, **self.config['scheduler'])
+        return [optimizer]
         
