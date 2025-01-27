@@ -20,8 +20,7 @@ def main(args, config:dict):
 
     # csv_path, spk_path, stat_path:str, n_frames, max_mask_len, shuffle_data=True       
     train_dataset = SpeechDataset(csv_path=config['train_path'], 
-                                  input_stat_path=config['input_stat_path'],
-                                  output_stat_path=config["output_stat_path"],
+                                  stat_path=config['stat_path'],
                                   n_frames=config['num_frames'], 
                                   max_mask_len=config['max_mask_len'], 
                                   shuffle_data=True
@@ -34,8 +33,7 @@ def main(args, config:dict):
     )
 
     valid_dataset = SpeechDataset(csv_path=config['valid_path'], 
-                                  input_stat_path=config['input_stat_path'],
-                                  output_stat_path=config["output_stat_path"],
+                                  stat_path=config['stat_path'],
                                   n_frames=config['num_frames'], 
                                   max_mask_len=0, 
                                   shuffle_data=True

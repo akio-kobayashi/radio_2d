@@ -13,7 +13,7 @@ warnings.filterwarnings('ignore')
     input_csv format:  key, clean, noisy, 
     output_csv format: key, clean, noisy
 '''
-def compute_features(input_csv, output_csv, output_dir):
+def compute_features(input_csv, output_csv, output_dir, num_mels):
     keys, cleans, noisys = [], [], []
 
     df = pd.read_csv(input_csv)
@@ -22,7 +22,7 @@ def compute_features(input_csv, output_csv, output_dir):
         clean_path = os.path.join(output_dir, row['key']+'_clean') + '.pt'
         torch.save(clean, clean_path)
 
-        noisy = M.get_mel_spectrogram(row['noisy'])
+        noisy = M.get_mel_spectrogram(row['noisy'], num_mels=num_mels)
         noisy_path = os.path.join(output_dir, row['key']+'_noisy') + '.pt'
         torch.save(noisy, noisy_path)
         
@@ -39,30 +39,40 @@ def compute_mean_var(input_csv):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu") 
     df = pd.read_csv(input_csv)
 
-    total_frames = 0
-    spec_sum=0.
-    spec_sum_square=0.
+    input_total_frames = 0
+    input_sum=0.
+    input_sum_square=0.
+    output_total_frames = 0
+    output_sum=0.
+    output_sum_square=0.
+
     for idx, row in df.iterrows():
         melspec = torch.load(row['clean']).to(device)
-        total_frames += melspec.shape[-1]
-        spec_sum += torch.sum(melspec, dim=-1)
-        spec_sum_square += torch.sum(torch.square(melspec))
-        melspec = torch.load(row['noisy']).to(device)
-        total_frames += melspec.shape[-1]
-        spec_sum += torch.sum(melspec, dim=-1)
-        spec_sum_square += torch.sum(torch.square(melspec))
+        input_total_frames += melspec.shape[-1]
+        input_sum += torch.sum(melspec, dim=-1)
+        input_sum_square += torch.sum(torch.square(melspec))
         
-    spec_mean = spec_sum/total_frames 
-    spec_var = spec_sum_square/total_frames - torch.square(spec_mean)
+        melspec = torch.load(row['noisy']).to(device)
+        output_total_frames += melspec.shape[-1]
+        output_sum += torch.sum(melspec, dim=-1)
+        output_sum_square += torch.sum(torch.square(melspec))
+        
+    input_mean = input_sum/input_total_frames 
+    input_var = input_sum_square/input_total_frames - torch.square(input_mean)
+    output_mean = output_sum/output_total_frames 
+    output_var = output_sum_square/output_total_frames - torch.square(output_mean)
 
-    return spec_mean, torch.sqrt(spec_var + 1.e-8)
+    return input_mean, torch.sqrt(input_var + 1.e-8), output_mean, torch.sqrt(output_var + 1.e-8)
 
-def save_mean_var(mean, var, path):
+def save_mean_var(input_mean, input_var, output_mean, output_var, path):
     #if isinstance(mean):
-    mean = mean.detach().cpu().numpy()
-    var = var.detach().cpu().numpy()
+    input_mean = input_mean.detach().cpu().numpy()
+    input_var = input_var.detach().cpu().numpy()
+    output_mean = output_mean.detach().cpu().numpy()
+    output_var = output_var.detach().cpu().numpy()
 
-    np.savez(path, mean=mean, var=var)
+    np.savez(path, input_mean=input_mean, input_var=input_var, 
+             output_mean=output_mean, output_var=output_var)
 
 def load_mean_var(path):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu") 
@@ -89,9 +99,10 @@ if __name__ == '__main__':
     parser.add_argument('--output_csv', type=str, required=True)
     parser.add_argument('--output_dir', type=str, default='./')
     parser.add_argument('--output_stats', type=str, default='stats.npz')
+    parser.add_argument('--num_mels', type=int, default=80)
     args=parser.parse_args()
        
-    compute_features(args.input_csv, args.output_csv, args.output_dir)
-    mean, var = compute_mean_var(args.output_csv)
-    save_mean_var(mean, var, args.output_stats)
+    compute_features(args.input_csv, args.output_csv, args.output_dir, args.num_mels)
+    input_mean, input_var, output_mean, output_var = compute_mean_var(args.output_csv)
+    save_mean_var(input_mean, input_var, output_mean, output_var, args.output_stats)
     

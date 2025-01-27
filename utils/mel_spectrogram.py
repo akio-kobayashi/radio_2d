@@ -59,15 +59,16 @@ def mel_spectrogram(y, n_fft, num_mels, sampling_rate, hop_size, win_size, fmin,
 
     return spec
 
-def get_mel_spectrogram(path):
+def get_mel_spectrogram(path, resample_rate=22050, num_mels=80, n_fft=1024, 
+                        hop_size=256, win_size=1024, fmin=0, fmax=8000):
     # HiFi GAN configuration
-    resample_rate = 22050
-    num_mels=80
-    n_fft=1024
-    hop_size=256
-    win_size=1024
-    fmin=0
-    fmax=8000
+    #resample_rate = 22050
+    #num_mels=80
+    #n_fft=1024
+    #hop_size=256
+    #win_size=1024
+    #fmin=0
+    #fmax=8000
    
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu") 
     waveform, sample_rate = torchaudio.load(path)

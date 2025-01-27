@@ -7,6 +7,18 @@ from torch import Tensor
 import math
 from einops import rearrange
 
+class GLU(nn.Module):
+    """
+    Custom implementation of GLU since the paper assumes GLU won't reduce
+    the dimension of tensor by 2.
+    """
+
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x):
+        return x * torch.sigmoid(x)
+    
 class TFEncoder(nn.Module):
     def __init__(self, dim, n_layers=5, n_heads=8):
         super(TFEncoder, self).__init__()
@@ -40,9 +52,9 @@ class UNetRadio2D(nn.Module):
             self.encoder.append(
                 nn.Sequential(
                     nn.Conv2d(in_channels, mid_channels, kernel_size=kernel_size, stride=stride, padding=(1, 1)),
-                    nn.ReLU(),
+                    GLU(),
                     nn.Conv2d(mid_channels, mid_channels, kernel_size=1, stride=1, padding=0),
-                    nn.ReLU(),
+                    GLU(),
                 )
             )
 
@@ -51,9 +63,9 @@ class UNetRadio2D(nn.Module):
                 0,
                 nn.Sequential(
                     nn.Conv2d(mid_channels, mid_channels, kernel_size=1, stride=1, padding=0),
-                    nn.ReLU(),
+                    GLU(),
                     nn.ConvTranspose2d(mid_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=(1, 1)),
-                    nn.ReLU(),
+                    GLU(),
                 )
             )
 
@@ -90,10 +102,13 @@ class UNetRadio2D(nn.Module):
 
         # Final fully connected layer
         if self.final_fc:
-            x = rearrange(x, 'b c f t -> b c t f')
+            b, c, f, t = x.shape
+            x = rearrange(x, 'b c f t -> (b t) (c f)')
             x = self.final_fc(x)
-            x = rearrange(x, 'b c t f -> b c f t')
-
+            x = rearrange(x, '(b t) f -> b f t', b=b)
+        else:
+            x = rearrange(x, 'b c f t->b (c f) t')
+            
         return x
     
 if __name__ == '__main__':

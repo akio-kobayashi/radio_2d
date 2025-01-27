@@ -14,7 +14,7 @@ import bin.compute_features as C
 
 class SpeechDataset(torch.utils.data.Dataset):
 
-    def __init__(self, csv_path:str, input_stat_path:str, output_stat_path:str, n_frames=128, max_mask_len=25, shuffle_data=True) -> None:
+    def __init__(self, csv_path:str, stat_path:str, n_frames=128, max_mask_len=25, shuffle_data=True) -> None:
         super().__init__()
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu") 
@@ -22,11 +22,9 @@ class SpeechDataset(torch.utils.data.Dataset):
         self.n_frames = n_frames
         self.max_mask_len = max_mask_len
 
-        self.input_mean, self.input_var = C.load_mean_var(input_stat_path) 
+        self.input_mean, self.input_var, self.output_mean, self.output_var = C.load_mean_var(stat_path) 
         self.input_mean = rearrange(self.input_mean, ' b (f c) -> b f c', c=1)
         self.input_var = rearrange(self.input_var, ' b (f c) -> b f c', c=1)
-
-        self.output_mean, self.output_var = C.load_mean_var(output_stat_path) 
         self.output_mean = rearrange(self.output_mean, ' b (f c) -> b f c', c=1)
         self.output_var = rearrange(self.output_var, ' b (f c) -> b f c', c=1)
 

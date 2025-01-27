@@ -8,6 +8,7 @@ from einops import rearrange
 from model import Generator, Discriminator, AuxDiscriminator
 import math
 from unet import UNetRadio2D
+from custom_loss import MaximumNegentropyLoss
 
 class CustomLRScheduler(object):
     def __init__(self, optimizer, n_samples, lr, epochs, mini_batch_size) -> None:
@@ -19,7 +20,7 @@ class CustomLRScheduler(object):
         self.mini_batch_size = mini_batch_size
         self.lr_decay = self.lr / float(self.epochs * (self.n_samples // self.mini_batch_size))
         self.current_step = 0
-        
+
     def step(self):
         self.lr = max(0., self.lr - self.lr_decay)
         for param_groups in self.optimizer.param_groups:
@@ -46,15 +47,25 @@ class LitDAE(pl.LightningModule):
         super().__init__()
         self.config = config
         self.model = UNetRadio2D(config)
+        self.negentropy_loss = MaximumNegentropyLoss()
+        self.lambda_negentropy = config['lambda_negentropy']
 
     def forward(self, data:Tensor) -> Tensor:
         return self.model(data) 
    
     def compute_loss(self, pred_clean, real_clean, valid=False):
         d = {}
-        _loss = 0.
 
+        _loss = F.l1_loss(pred_clean, real_clean)
+        _neg_los = self.negentropy_loss(pred_clean, real_clean)
+        if valid is True:
+            d['valid_l1_loss'] = _loss
+            d['valid_neg_loss'] = _neg_los
+        else:
+            d['l1_loss'] = _loss
+            d['neg_loss'] = _neg_los
         # L1 loss
+        _loss += self.lambda_negentropy * _neg_los
         if valid is True:
             d['valid_loss'] = _loss
         else:
@@ -88,13 +99,6 @@ class LitDAE(pl.LightningModule):
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(),
                                      **self.config['optimizer'])
-        return (
-            {
-            "optimizer": optimizer,
-            "lr_scheduler": {
-                "scheduler": torch.optim.lr_scheduler.LinearLR(optimizer, start_factor=1.0, end_factor=0.1, total_iters=self.config['process']['batch_size']),
-                "monitor": "val_loss"
-                }
-            }
-        )
+        scheduler = CustomLRScheduler(optimizer, **self.config['scheduler'])
+        return [optimizer], [scheduler]
         

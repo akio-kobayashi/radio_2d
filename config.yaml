@@ -1,0 +1,82 @@
+# data
+train_path: ./train.csv
+valid_path: ./valid.csv
+stat_path: ./stats.npz
+batch_size: 64
+epochs: 200
+n_samples: 10000 &shared_n_samples
+lambda_negentropy: 1.0
+
+# process
+process:
+  batch_size: 64
+  num_workers: 0
+
+# trainer
+trainer:
+  accelerator: 'auto'
+  accumulate_grad_batches: 5
+  max_epochs: 200
+  precision: '16-mixed'
+  profiler: 'simple'
+  gradient_clip_val: 5.0
+
+# logger
+logger:
+  save_dir: './model'
+  version: 1
+  name: 'lightning_logs'
+
+# checkpoint
+checkpoint:
+  monitor: 'valid_loss'
+  filename: 'checkpoint_{epoch}-{step}-{valid_gen_loss:.3f}'
+  save_last: True
+  save_top_k: 1
+  mode: 'min'
+  every_n_epochs: 10
+
+# optimizer
+optimizer:
+  lr: 1.e-4
+  betas:
+    - 0.5
+    - 0.999
+  weight_decay: 1.e-6
+  
+# scheduler
+scheduler:
+  n_samples: 10000
+  lr: 1.e-4
+  epochs: 200
+  mini_batch_size: 64
+
+# model
+unet:
+  #normalize: False
+  #floor: False
+  #resample: False
+  depth: 4  # Number of encoder-decoder layers
+  in_channels: 1
+  mid_channels: 16
+  out_channels: 1
+  max_channels: 64
+  kernel_size:
+    - 4
+    - 4
+  growth: 2
+  #rescale: False
+  stride:
+    - 2
+    - 2
+  padding:
+    - 1
+    - 1  # Ensures input-output size consistency
+  reference: None
+  #feature_dim: 80
+  #attention: False
+  #causal: False
+  n_layers: 3
+  n_heads: 8
+  input_mel_dim: 160
+  final_mel_dim: 80
