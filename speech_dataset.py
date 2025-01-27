@@ -14,7 +14,7 @@ import bin.compute_features as C
 
 class SpeechDataset(torch.utils.data.Dataset):
 
-    def __init__(self, csv_path:str, stat_path:str, n_frames=128, max_mask_len=25, shuffle_data=True) -> None:
+    def __init__(self, csv_path:str, input_stat_path:str, output_stat_path:str, n_frames=128, max_mask_len=25, shuffle_data=True) -> None:
         super().__init__()
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu") 
@@ -22,9 +22,14 @@ class SpeechDataset(torch.utils.data.Dataset):
         self.n_frames = n_frames
         self.max_mask_len = max_mask_len
 
-        self.mean, self.var = C.load_mean_var(stat_path)
-        self.mean = rearrange(self.mean, ' b (f c) -> b f c', c=1)
-        self.var = rearrange(self.var, ' b (f c) -> b f c', c=1)
+        self.input_mean, self.input_var = C.load_mean_var(input_stat_path) 
+        self.input_mean = rearrange(self.input_mean, ' b (f c) -> b f c', c=1)
+        self.input_var = rearrange(self.input_var, ' b (f c) -> b f c', c=1)
+
+        self.output_mean, self.output_var = C.load_mean_var(output_stat_path) 
+        self.output_mean = rearrange(self.output_mean, ' b (f c) -> b f c', c=1)
+        self.output_var = rearrange(self.output_var, ' b (f c) -> b f c', c=1)
+
         self.df = pd.read_csv(csv_path)
         self.df_clean = self.df[['key', 'clean']]
         self.df_noisy = self.df[['key', 'noisy']]
@@ -61,7 +66,7 @@ class SpeechDataset(torch.utils.data.Dataset):
         row_noisy = self.df_noisy.iloc[idx]
 
         mel_clean = torch.load(row_clean['clean'])
-        mel_clean = (mel_clean.to(self.device) - self.mean)/self.var
+        mel_clean = (mel_clean.to(self.device) - self.output_mean)/self.output_var
         if mel_clean.shape[-1] < self.n_frames:
             mel_clean = torch.cat([mel_clean, torch.zeros(mel_clean.shape[0], mel_clean.shape[-2],
                                                           self.n_frames - mel_clean.shape[-1],
@@ -69,7 +74,7 @@ class SpeechDataset(torch.utils.data.Dataset):
         mel_clean_data, mask_clean = self.prepare_data(mel_clean)
 
         mel_noisy = torch.load(row_noisy['melspec'])
-        mel_noisy = (mel_noisy.to(self.device) - self.mean)/self.var
+        mel_noisy = (mel_noisy.to(self.device) - self.input_mean)/self.input_var
         if mel_noisy.shape[-1] < self.n_frames:
             mel_noisy = torch.cat([mel_noisy, torch.zeros(mel_noisy.shape[0], mel_noisy.shape[-2],
                                                           self.n_frames - mel_noisy.shape[-1],
@@ -79,8 +84,6 @@ class SpeechDataset(torch.utils.data.Dataset):
         return mel_clean_data, mask_clean, mel_noisy_data, mask_noisy
     
 def data_processing(data):
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu") 
     data_clean, mask_clean = [], []
     data_noisy, mask_noisy = [], []
     

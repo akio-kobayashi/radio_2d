@@ -47,275 +47,54 @@ class LitDAE(pl.LightningModule):
         self.config = config
         self.model = UNetRadio2D(config)
 
-    def forward(self, data:Tensor, mask:Tensor) -> Tensor:
-        return self.model(data, mask) 
+    def forward(self, data:Tensor) -> Tensor:
+        return self.model(data) 
    
-    def compute_generator_loss(self, real_noisy, real_clean, cycle_noisy, cycle_clean, 
-                               ident_noisy, ident_clean, d_fake_noisy, d_fake_clean,
-                               d_fake_cycle_noisy, d_fake_cycle_clean, valid=False):
+    def compute_loss(self, pred_clean, real_clean, valid=False):
         d = {}
+        _loss = 0.
 
-        # Cycle loss
-        _cycle_loss = torch.mean(torch.abs(real_noisy - cycle_noisy)) + torch.mean(torch.abs(real_clean - cycle_clean))
+        # L1 loss
         if valid is True:
-            d['valid_cycle_loss'] = _cycle_loss
+            d['valid_loss'] = _loss
         else:
-            d['cycle_loss'] = _cycle_loss
-        # Identity loss
-        _ident_loss = torch.mean(torch.abs(real_noisy - ident_noisy)) + torch.mean(torch.abs(real_clean - ident_clean))
-        if valid is True:
-            d['valid_identity_loss'] = _ident_loss
-        else:
-            d['identity_loss'] = _ident_loss
+            d['loss'] = _loss
 
-        # Generator adversarila loss
-        _gen_loss_noisy2clean = torch.mean((1 - d_fake_clean) ** 2)
-        _gen_loss_clean2noisy = torch.mean((1 - d_fake_noisy) ** 2)
-        if valid is True:
-            d['valid_generator_loss_noisy2clean'] = _gen_loss_noisy2clean
-            d['valid_generator_loss_clean2noisy'] = _gen_loss_clean2noisy
-        else:
-            d['generator_loss_noisy2clean'] = _gen_loss_noisy2clean
-            d['generator_loss_clean2noisy'] = _gen_loss_clean2noisy
-
-        # Generator 2-step adversarial loss
-        _gen_loss_noisy2clean_2nd = torch.mean((1 - d_fake_cycle_clean) ** 2)
-        _gen_loss_clean2noisy_2nd = torch.mean((1 - d_fake_cycle_noisy) ** 2)
-        if valid is True:
-            d['valid_generator_loss_noisy2clean_2nd'] = _gen_loss_noisy2clean_2nd
-            d['valid_generator_loss_clean2noisy_2nd'] = _gen_loss_clean2noisy_2nd
-        else:
-            d['generator_loss_noisy2clean_2nd'] = _gen_loss_noisy2clean_2nd
-            d['generator_loss_clean2noisy_2nd'] = _gen_loss_clean2noisy_2nd
-
-        _gen_loss = _gen_loss_noisy2clean + _gen_loss_clean2noisy + \
-                    _gen_loss_noisy2clean_2nd + _gen_loss_clean2noisy_2nd + \
-                    self.cycle_loss_lambda * _cycle_loss + \
-                    self.identity_loss_lambda * _ident_loss
-        if valid is True:        
-            d['valid_generator_loss'] = _gen_loss
-        else:
-            d['generator_loss'] = _gen_loss
-        self.log_dict(d)
-
-        return _gen_loss
-
-    def compute_clean_noisy_logits_loss(self, real_noisy, fake_noisy, cycle_noisy, ident_noisy,
-                                  real_clean, fake_clean, cycle_clean, ident_clean, valid=False):
-        d = {}
-        logits_real_noisy = self.clean_noisy_classifier(real_noisy)
-        logits_fake_noisy = self.clean_noisy_classifier(fake_noisy)
-        logits_cycle_noisy = self.clean_noisy_classifier(cycle_noisy)
-        logits_ident_noisy = self.clean_noisy_classifier(ident_noisy)
-        loss_real_noisy = F.cross_entropy(logits_real_noisy, torch.ones(real_noisy.shape[0], type=torch.int64, device=real_noisy.device))
-        loss_fake_noisy = F.cross_entropy(logits_fake_noisy, torch.ones(real_noisy.shape[0], type=torch.int64, device=real_noisy.device))
-        loss_cycle_noisy = F.cross_entropy(logits_cycle_noisy, torch.ones(real_noisy.shape[0], type=torch.int64, device=real_noisy.device))
-        loss_ident_noisy = F.cross_entropy(logits_ident_noisy, torch.ones(real_noisy.shape[0], type=torch.int64, device=real_noisy.device))
-        noisy_loss = loss_real_noisy + loss_fake_noisy + loss_cycle_noisy + loss_ident_noisy
-        if valid is True:
-            d['valid_noisy_loss'] = noisy_loss
-        else:
-            d['noisy_loss'] = noisy_loss
-
-        logits_real_clean = self.clean_noisy_classifier(real_clean)
-        logits_fake_clean = self.clean_noisy_classifier(fake_clean)
-        logits_cycle_clean = self.clean_noisy_classifier(cycle_clean)
-        logits_ident_clean = self.clean_noisy_classifier(ident_clean)
-        loss_real_clean = F.cross_entropy(logits_real_clean, torch.zeros(real_clean.shape[0], type=torch.int64, device=real_clean.device))
-        loss_fake_clean = F.cross_entropy(logits_fake_clean, torch.zeros(real_clean.shape[0], type=torch.int64, device=real_clean.device))
-        loss_cycle_clean = F.cross_entropy(logits_cycle_clean, torch.zeros(real_clean.shape[0], type=torch.int64, device=real_clean.device))
-        loss_ident_clean = F.cross_entropy(logits_ident_clean, torch.zeros(real_clean.shape[0], type=torch.int64, device=real_clean.device)))
-        clean_loss = loss_real_clean + loss_fake_clean + loss_cycle_clean + loss_ident_clean
-        if valid is True:
-            d['valid_clean_loss'] = clean_loss
-        else:
-            d['clean_loss'] = clean_loss
-
-        _loss = noisy_loss + clean_loss
-        if valid is True:
-            d['valid_clean_noisy_loss'] = _loss
-        else:
-            d['clean_noisy_loss'] = _loss
         self.log_dict(d)
 
         return _loss
-        
+
     def training_step(self, batch, batch_idx:int) -> Tensor:
-        _loss = 0.
-        real_clean, mask_clean, real_noisy, mask_noisy = batch
-
-        opt_g, opt_d = self.optimizers()
-
-        # Generator step
-        self.toggle_optimizer(opt_g)
-        self.toggle_training_mode(generator=True)
-
-        fake_clean = self.forward(real_noisy, mask_noisy)
-        cycle_noisy = self.generator_clean2noisy(fake_clean, torch.ones_like(fake_clean))
-        fake_noisy = self.generator_clean2noisy(real_clean, mask_clean)
-        cycle_clean = self.generator_noisy2clean(fake_noisy, torch.ones_like(fake_noisy))
-        ident_noisy = self.generator_clean2noisy(real_noisy, torch.ones_like(real_noisy))
-        ident_clean = self.generator_noisy2clean(real_clean, torch.ones_like(real_clean))
-
-        '''
-            data: real_noisy, real_clean, fake_noisy, fake_clean, cycle_noisy, cycle_clean
-
-            1) discriminator_noisy     real_noisy=true,  fake_noisy=clean2noisy(clean)=false
-            2) discriminator_noisy2    real_noisy=true,  cycle_noisy=clean2noisy(noisy2clean(noisy))=false
-            3) discriminator_clean     real_clean=true,  fake_clean=noisy2clean(noisy)=false
-            4) discriminator_clean2    real_clean=true,  cycle_noisy=noisy2clean(clean2noisy(clean))=false
-        '''
-
-        d_fake_noisy = self.discriminator_noisy(fake_noisy)
-        d_fake_clean = self.discriminator_clean(fake_clean)
-        
-        d_fake_cycle_noisy = self.discriminator_noisy2(cycle_noisy)
-        d_fake_cycle_clean = self.discriminator_clean2(cycle_clean)
-
-        '''
-            clean/noisy loss
-            data: real_noisy, real_clean, fake_noisy, fake_clean, cycle_noisy, cycle_clean
-            classified to noisy: real_noisy, cycle_noisy, fake_noisy, ident_noisy
-            classified to clean: real_clean, fake_clean, cycle_clean, ident_clean
-        '''
-        clean_noisy_loss = self.compute_clean_noisy_logits_loss(real_noisy, fake_noisy, cycle_noisy, ident_noisy,
-                                                    real_clean, fake_clean, cycle_clean, ident_clean, valid=False)
-
-        gen_loss = self.compute_generator_loss(
-            real_noisy, real_clean, cycle_noisy, cycle_clean, 
-            ident_noisy, ident_clean, d_fake_noisy, d_fake_clean,
-            d_fake_cycle_noisy, d_fake_cycle_clean, valid=False
-        )
-        gen_loss += self.lambda_clean_noisy * clean_noisy_loss
-        self.manual_backward(gen_loss)
-        opt_g.step()
-        opt_g.zero_grad()
-        self.untoggle_optimizer(opt_g)
-
-        # Discriminator
-        self.toggle_training_mode(generator=False)
-        self.toggle_optimizer(opt_d)
-
-        d_real_noisy = self.discriminator_noisy(real_noisy)
-        d_real_clean = self.discriminator_clean(real_clean)
-        d_real_noisy2 = self.discriminator_noisy2(real_noisy)
-        d_real_clean2 = self.discriminator_clean2(real_clean)
-        generated_noisy = self.generator_clean2noisy(real_clean, mask_clean)
-        d_fake_noisy = self.discriminator_noisy(generated_noisy)
-        
-        # for 2-step adversarial loss noisy->clean
-        cycled_clean = self.generator_noisy2clean(generated_noisy, torch.ones_like(generated_noisy))
-        d_cycled_clean = self.discriminator_clean2(cycled_clean)
-
-        generated_clean = self.generator_noisy2clean(real_noisy, mask_noisy)
-        d_fake_clean = self.discriminator_clean(generated_clean)
-        # for 2-step adversarial loss clean->noisy
-        cycled_noisy = self.generator_clean2noisy(generated_clean, torch.ones_like(generated_clean))
-        d_cycled_noisy = self.discriminator_noisy2(cycled_noisy)
-
-        dsc_loss = self.compute_discriminator_loss(d_real_noisy, d_fake_noisy, d_cycled_noisy, d_real_noisy2,
-                                                   d_real_clean, d_fake_clean, d_cycled_clean, d_real_clean2, valid=False)
-        self.manual_backward(dsc_loss)
-        opt_d.step()
-        opt_d.zero_grad()
-        self.untoggle_optimizer(opt_d)
-
-        #update scheduler using self.current_epoch
-        for sch in self.lr_schedulers():
-            sch.step()
+        self.model.train()
+        real_clean, _, real_noisy, mask_noisy = batch
+        pred_clean = self.model(real_noisy * mask_noisy)
+        _loss = self.compute_loss(pred_clean, real_clean, valid=False)
 
         # return nothing becuase of manual updates   
-        return 
+        return _loss
 
     def validation_step(self, batch, batch_idx: int):
-        """
-        Validation step for evaluating the Generator and Discriminator.
-    
-        Args:
-            batch: Validation batch containing input data.
-            batch_idx: Index of the current batch.
-    
-        Returns:
-            Dictionary containing validation losses for logging.
-        """
-        real_clean, mask_clean, real_noisy, mask_noisy = batch
-
-        # Set models to evaluation mode
-        self.generator_noisy2clean.eval()
-        self.generator_clean2noisy.eval()
-        self.discriminator_noisy.eval()
-        self.discriminator_clean.eval()
-        self.discriminator_noisy2.eval()
-        self.discriminator_clean2.eval()
-        self.clean_noisy_classifier.eval()
-
+        self.model.eval()
         # Forward pass for Generator
         with torch.no_grad():  # Disable gradient computation for validation
-            fake_clean = self.forward(real_noisy, mask_noisy)
-            cycle_noisy = self.generator_clean2noisy(fake_clean, torch.ones_like(fake_clean))
-            fake_noisy = self.generator_clean2noisy(real_clean, mask_clean)
-            cycle_clean = self.generator_noisy2clean(fake_noisy, torch.ones_like(fake_noisy))
-            ident_noisy = self.generator_clean2noisy(real_noisy, torch.ones_like(real_noisy))
-            ident_clean = self.generator_noisy2clean(real_clean, torch.ones_like(real_clean))
-
-            # Compute adversarial losses for Generator
-            d_fake_noisy = self.discriminator_noisy(fake_noisy)
-            d_fake_clean = self.discriminator_clean(fake_clean)
-            d_fake_cycle_noisy = self.discriminator_noisy2(cycle_noisy)
-            d_fake_cycle_clean = self.discriminator_clean2(cycle_clean)
-
-            gen_loss = self.compute_generator_loss(
-                real_noisy, real_clean, cycle_noisy, cycle_clean,
-                ident_noisy, ident_clean, d_fake_noisy, d_fake_clean,
-                d_fake_cycle_noisy, d_fake_cycle_clean, valid=True
-            )
-
-            clean_noisy_loss = self.compute_clean_noisy_logits_loss(
-                real_noisy, fake_noisy, cycle_noisy, ident_noisy,
-                real_clean, fake_clean, cycle_clean, ident_clean, valid=True
-            )
-
-            gen_loss += self.lambda_clean_noisy * clean_noisy_loss
-
-            # Compute losses for Discriminator
-            d_real_noisy = self.discriminator_noisy(real_noisy)
-            d_real_clean = self.discriminator_clean(real_clean)
-            d_real_noisy2 = self.discriminator_noisy2(real_noisy)
-            d_real_clean2 = self.discriminator_clean2(real_clean)
-            generated_noisy = self.generator_clean2noisy(real_clean, mask_clean)
-            d_fake_noisy = self.discriminator_noisy(generated_noisy)
-            cycled_clean = self.generator_noisy2clean(generated_noisy, torch.ones_like(generated_noisy))
-            d_cycled_clean = self.discriminator_clean2(cycled_clean)
-            generated_clean = self.generator_noisy2clean(real_noisy, mask_noisy)
-            d_fake_clean = self.discriminator_clean(generated_clean)
-            cycled_noisy = self.generator_clean2noisy(generated_clean, torch.ones_like(generated_clean))
-            d_cycled_noisy = self.discriminator_noisy2(cycled_noisy)
-
-            dsc_loss = self.compute_discriminator_loss(
-                d_real_noisy, d_fake_noisy, d_cycled_noisy, d_real_noisy2,
-                d_real_clean, d_fake_clean, d_cycled_clean, d_real_clean2, valid=True
-            )
+            real_clean, _, real_noisy, mask_noisy = batch
+            pred_clean = self.model(real_noisy * mask_noisy)
+            _loss = self.compute_loss(pred_clean, real_clean, valid=True)
 
         # Return losses for further analysis
-        return {
-            "valid_gen_loss": gen_loss.item(),
-            "valid_speaker_loss": speaker_loss.item(),
-            "valid_clean_noisy_loss": clean_noisy_loss.item(),
-            "valid_dsc_loss": dsc_loss.item()
-        }
+        return _loss
 
 
     def configure_optimizers(self):
-        gen_optimizer = torch.optim.Adam(list(self.generator_noisy2clean.parameters())
-                                         +list(self.generator_clean2noisy.parameters()),
-                                        **self.config['gen_optimizer'])
-        gen_scheduler = CustomLRScheduler(gen_optimizer, **self.config['gen_scheduler'])
-
-        dsc_optimizer = torch.optim.Adam(list(self.discriminator_noisy.parameters())
-                                         +list(self.discriminator_clean.parameters())
-                                         +list(self.discriminator_noisy2.parameters())
-                                         +list(self.discriminator_clean2.parameters()),
-                                        **self.config['dsc_optimizer'])
-        dsc_scheduler = CustomLRScheduler(dsc_optimizer, **self.config['dsc_scheduler'])
-
-        return [gen_optimizer, dsc_optimizer], [gen_scheduler, dsc_scheduler]
+        optimizer = torch.optim.Adam(self.parameters(),
+                                     **self.config['optimizer'])
+        return (
+            {
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": torch.optim.lr_scheduler.LinearLR(optimizer, start_factor=1.0, end_factor=0.1, total_iters=self.config['process']['batch_size']),
+                "monitor": "val_loss"
+                }
+            }
+        )
+        

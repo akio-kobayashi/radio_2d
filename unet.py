@@ -90,7 +90,6 @@ class UNetRadio2D(nn.Module):
 
         # Final fully connected layer
         if self.final_fc:
-            print(x.shape)
             x = rearrange(x, 'b c f t -> b c t f')
             x = self.final_fc(x)
             x = rearrange(x, 'b c t f -> b c f t')
