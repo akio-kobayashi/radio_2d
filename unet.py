@@ -129,7 +129,7 @@ if __name__ == '__main__':
             'stride': (2, 2),
             'padding': (1, 1),  # Ensures input-output size consistency
             'reference': None,
-            'feature_dim': 80,
+            'feature_dim': 160,
             'attention': False,
             'causal': False,
             'n_layers': 3,
