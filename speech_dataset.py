@@ -64,6 +64,8 @@ class SpeechDataset(torch.utils.data.Dataset):
         row_noisy = self.df_noisy.iloc[idx]
 
         mel_clean = torch.load(row_clean['clean'])
+        #print(mel_clean.shape)
+        #print(self.output_mean.shape)
         mel_clean = (mel_clean.to(self.device) - self.output_mean)/self.output_var
         if mel_clean.shape[-1] < self.n_frames:
             mel_clean = torch.cat([mel_clean, torch.zeros(mel_clean.shape[0], mel_clean.shape[-2],
@@ -71,7 +73,7 @@ class SpeechDataset(torch.utils.data.Dataset):
                                                           device=mel_clean.device)], dim=-1)
         mel_clean_data, mask_clean = self.prepare_data(mel_clean)
 
-        mel_noisy = torch.load(row_noisy['melspec'])
+        mel_noisy = torch.load(row_noisy['noisy'])
         mel_noisy = (mel_noisy.to(self.device) - self.input_mean)/self.input_var
         if mel_noisy.shape[-1] < self.n_frames:
             mel_noisy = torch.cat([mel_noisy, torch.zeros(mel_noisy.shape[0], mel_noisy.shape[-2],
