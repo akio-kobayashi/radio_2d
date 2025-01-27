@@ -48,14 +48,14 @@ def compute_mean_var(input_csv):
 
     for idx, row in df.iterrows():
         melspec = torch.load(row['clean']).to(device)
-        input_total_frames += melspec.shape[-1]
-        input_sum += torch.sum(melspec, dim=-1)
-        input_sum_square += torch.sum(torch.square(melspec))
-        
-        melspec = torch.load(row['noisy']).to(device)
         output_total_frames += melspec.shape[-1]
         output_sum += torch.sum(melspec, dim=-1)
         output_sum_square += torch.sum(torch.square(melspec))
+        
+        melspec = torch.load(row['noisy']).to(device)
+        input_total_frames += melspec.shape[-1]
+        input_sum += torch.sum(melspec, dim=-1)
+        input_sum_square += torch.sum(torch.square(melspec))
         
     input_mean = input_sum/input_total_frames 
     input_var = input_sum_square/input_total_frames - torch.square(input_mean)
