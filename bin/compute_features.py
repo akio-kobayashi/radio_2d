@@ -27,8 +27,8 @@ def compute_features(input_csv, output_csv, output_dir, num_mels):
         torch.save(noisy, noisy_path)
         
         keys.append(row['key'])
-        clean.append(clean_path)
-        noisy.append(noisy_path)
+        cleans.append(clean_path)
+        noisys.append(noisy_path)
     
     out_df = pd.DataFrame(index=None)
     out_df['key'], out_df['clean'], out_df['noisy'] = keys, cleans, noisys
