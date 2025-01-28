@@ -2,7 +2,6 @@ import torch
 import pytorch_lightning as pl
 from lightning.pytorch.loggers import TensorBoardLogger
 import torch.utils.data as data
-from solver import LitGAN
 import torch.utils.data as dat
 import torch.multiprocessing as mp
 import torchaudio
@@ -19,7 +18,7 @@ warnings.filterwarnings('ignore')
 import glob
 import os, sys
 
-def main(args, config:dict):
+def main(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")    
 
     hifigan, vocoder_train_setup, denoiser = torch.hub.load('NVIDIA/DeepLearningExamples:torchhub', 'nvidia_hifigan')
@@ -31,9 +30,9 @@ def main(args, config:dict):
         denoising_strength = 0.005
         audio = hifigan(mel).float()
         audio = denoiser(audio.squeeze(1), denoising_strength)
-        audio = audio.squeeze(1) * vocoder_train_setup['max_wav_value']
-        outpath=os.path.join(args.output_dir, os.path.basename(path).splitext()[0] + '.wav')
-        torchaudio.save(uri=outpath, src=audio.to('cpu'))
+        audio = audio.squeeze(1) #* vocoder_train_setup['max_wav_value']
+        outpath=os.path.join(args.output_dir, os.path.splitext(os.path.basename(path))[0] + '.wav')
+        torchaudio.save(uri=outpath, src=audio.to('cpu'), sample_rate=22050)
 
 if __name__ == '__main__':
     torch.multiprocessing.set_start_method('spawn', force=True)

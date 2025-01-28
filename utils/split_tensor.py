@@ -1,5 +1,6 @@
 import torch
 import torch.nn.functional as F
+from einops import rearrange
 
 def split_and_reshape(tensor, n_sample):
     """
@@ -29,10 +30,8 @@ def reshape_back(tensor, original_sample_size):
     
     # 元のバッチサイズを計算
     batch = new_batch // ((original_sample_size + n_sample - 1) // n_sample)
-    
     # 形状を元に戻す
-    reshaped_tensor = tensor.view(batch, feature, -1)
-    
+    reshaped_tensor = tensor.reshape(batch, feature, -1)
     # パディングを除去
     reshaped_tensor = reshaped_tensor[:, :, :original_sample_size]
     return reshaped_tensor

@@ -100,5 +100,14 @@ class LitDAE(pl.LightningModule):
         optimizer = torch.optim.Adam(self.parameters(),
                                      **self.config['optimizer'])
         #scheduler = CustomLRScheduler(optimizer, **self.config['scheduler'])
-        return [optimizer]
+        #return [optimizer]
+        return (
+            {
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": torch.optim.lr_scheduler.LinearLR(optimizer, start_factor=1.0, end_factor=0.5, total_iters=100),
+                "monitor": "val_loss"
+                }
+            }
+        )
         
