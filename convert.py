@@ -13,6 +13,7 @@ from einops import rearrange
 from argparse import ArgumentParser
 import yaml
 import pandas as pd
+import os, sys
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -31,7 +32,7 @@ def main(args, config:dict):
 
     df = pd.read_csv(args.csv)
     for index, row in df.iterrows():
-        mel = torch.load(df['noisy']).to(device)
+        mel = torch.load(row['noisy']).to(device)
         mel = (mel - input_mean)/input_var
         original_length = mel.shape[-1]
         split_mel = S.split_and_reshape(mel, config['num_frames'])
@@ -39,13 +40,17 @@ def main(args, config:dict):
         output = model.forward(split_mel, mask)
         output = S.reshape_back(output, original_length)
         output = output * output_var + output_mean
-        
+               
+        path = os.path.join(args.output_dir, row['key']+'.pt')
+        torch.save(output, path)
+
 if __name__ == '__main__':
     torch.multiprocessing.set_start_method('spawn', force=True)
     parser = ArgumentParser()
     parser.add_argument('--config', type=str, required=True)
     parser.add_argument('--checkpoint', type=str, required=True)
     parser.add_argument('--csv', type=str)
+    parser.add_argument('--output_dir', type=str, default='./')
     parser.add_argument('--gpus', nargs='*', type=int)
     args=parser.parse_args()
 
