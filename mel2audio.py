@@ -30,9 +30,9 @@ def main(args):
         denoising_strength = 0.005
         audio = hifigan(mel).float()
         audio = denoiser(audio.squeeze(1), denoising_strength)
-        audio = audio.squeeze(1) #* vocoder_train_setup['max_wav_value']
+        audio = torch.clamp(audio.squeeze(1), -1.0, 1.0) * vocoder_train_setup['max_wav_value']
         outpath=os.path.join(args.output_dir, os.path.splitext(os.path.basename(path))[0] + '.wav')
-        torchaudio.save(uri=outpath, src=audio.to('cpu'), sample_rate=22050)
+        torchaudio.save(uri=outpath, src=audio.short().to('cpu'), sample_rate=22050)
 
 if __name__ == '__main__':
     torch.multiprocessing.set_start_method('spawn', force=True)

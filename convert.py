@@ -36,11 +36,8 @@ def main(args, config:dict):
         mel = (mel - input_mean)/input_var
         original_length = mel.shape[-1]
         split_mel = S.split_and_reshape(mel, config['num_frames'])
-        #print(original_length)
-        #print(split_mel.shape)
-        mask = torch.ones_like(split_mel, device=split_mel.device)
+        #mask = torch.ones_like(split_mel, device=split_mel.device)
         output = model.forward(split_mel)
-        #print(output.shape)
         output = S.reshape_back(output, original_length)
         output = output * output_var + output_mean
                

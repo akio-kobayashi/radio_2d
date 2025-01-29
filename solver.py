@@ -60,7 +60,7 @@ class LitDAE(pl.LightningModule):
 
         #pred_clean = pred_clean * self.var + self.mean
         #real_clean = real_clean * self.var + self.mean
-        eps = 1.e-9
+        #eps = 1.e-9
         #_loss = F.mse_loss(torch.log(torch.where(pred_clean<0., torch.tensor(1.e-9).cuda(), pred_clean)),
         #                  torch.log(torch.where(real_clean<0., torch.tensor(1.e-9).cuda(), real_clean)))
         _loss = F.mse_loss(pred_clean, real_clean)
