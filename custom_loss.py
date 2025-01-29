@@ -39,12 +39,15 @@ class MaximumNegentropyLoss(torch.nn.Module):
             Tensor: Negentropy loss value.
         """
         def G(x):
-            return torch.log(torch.cosh(x))  # Example of G(x)
+            return torch.log(torch.cosh(x))  # Example of G(x), non-negative
 
         # Compute negentropy
         negentropy_pred = negentropy(prediction, G)
         negentropy_ref = negentropy(reference, G)
 
         # Loss: Mean squared error of negentropies
-        loss = torch.nn.functional.mse_loss(negentropy_pred, negentropy_ref)
+        eps = 1.e-9
+        loss = torch.mean(torch.abs(negentropy_pred - negentropy_ref) / (torch.abs(negentropy_ref) + eps))
+        #loss = torch.nn.functional.mse_loss(torch.log(negentropy_pred+1.e-9), torch.log(negentropy_ref+1.e-9))
+        #loss = torch.nn.functional.mse_loss(negentropy_pred, negentropy_ref)
         return loss

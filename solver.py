@@ -49,23 +49,31 @@ class LitDAE(pl.LightningModule):
         self.model = UNetRadio2D(config)
         self.negentropy_loss = MaximumNegentropyLoss()
         self.lambda_negentropy = config['lambda_negentropy']
-
+        self.mean=0.
+        self.var=1.
+        
     def forward(self, data:Tensor) -> Tensor:
         return self.model(data) 
    
     def compute_loss(self, pred_clean, real_clean, valid=False):
         d = {}
 
-        _loss = F.l1_loss(pred_clean, real_clean)
-        _neg_los = self.negentropy_loss(pred_clean, real_clean)
+        #pred_clean = pred_clean * self.var + self.mean
+        #real_clean = real_clean * self.var + self.mean
+        eps = 1.e-9
+        #_loss = F.mse_loss(torch.log(torch.where(pred_clean<0., torch.tensor(1.e-9).cuda(), pred_clean)),
+        #                  torch.log(torch.where(real_clean<0., torch.tensor(1.e-9).cuda(), real_clean)))
+        _loss = F.mse_loss(pred_clean, real_clean)
+        #_loss = torch.log(1. + torch.mean(torch.abs(pred_clean - real_clean)/(torch.abs(real_clean) + eps)))
+        _neg_loss = self.negentropy_loss(pred_clean, real_clean)
         if valid is True:
             d['valid_l1_loss'] = _loss
-            d['valid_neg_loss'] = _neg_los
+            d['valid_neg_loss'] = _neg_loss
         else:
             d['l1_loss'] = _loss
-            d['neg_loss'] = _neg_los
+            d['neg_loss'] = _neg_loss
         # L1 loss
-        _loss += self.lambda_negentropy * _neg_los
+        _loss += self.lambda_negentropy * _neg_loss
         if valid is True:
             d['valid_loss'] = _loss
         else:
@@ -110,4 +118,8 @@ class LitDAE(pl.LightningModule):
                 }
             }
         )
+        
+    def set_mean_var(self, mean, var):
+        self.mean = mean
+        self.var = var
         

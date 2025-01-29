@@ -82,6 +82,9 @@ class SpeechDataset(torch.utils.data.Dataset):
         mel_noisy_data, mask_noisy = self.prepare_data(mel_noisy)
 
         return mel_clean_data, mask_clean, mel_noisy_data, mask_noisy
+
+    def get_mean_var(self):
+        return self.output_mean, self.output_var
     
 def data_processing(data):
     data_clean, mask_clean = [], []

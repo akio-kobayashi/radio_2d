@@ -45,6 +45,9 @@ def main(args, config:dict):
                                    collate_fn=speech_dataset.data_processing
     )
 
+    mean, var = train_dataset.get_mean_var()
+    model.set_mean_var(mean, var)
+    
     callbacks = [
         pl.callbacks.ModelCheckpoint( **config['checkpoint'])
     ]
