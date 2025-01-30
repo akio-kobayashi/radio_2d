@@ -44,7 +44,7 @@ def mag_spectrogram(y, n_fft, hop_size, win_size, center=False):
 
     spec = torch.abs(spec) + 1.e-9 
 
-    return spec
+    return spec[:, 1:, :]
 
 def mel_spectrogram(y, n_fft, num_mels, sampling_rate, hop_size, win_size, fmin, fmax, center=False):
     if torch.min(y) < -1.:
@@ -70,7 +70,7 @@ def mel_spectrogram(y, n_fft, num_mels, sampling_rate, hop_size, win_size, fmin,
     spec = torch.matmul(mel_basis[str(fmax)+'_'+str(y.device)], spec)
     spec = spectral_normalize_torch(spec)
 
-    return spec[:, 1:, :] # omit 0-dim
+    return spec
 
 def get_mel_spectrogram(path, resample_rate=22050, num_mels=80, n_fft=1024, 
                         hop_size=256, win_size=1024, fmin=0, fmax=8000):
