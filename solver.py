@@ -8,6 +8,7 @@ from einops import rearrange
 from model import Generator, Discriminator, AuxDiscriminator
 import math
 from unet import UNetRadio2D
+from conformer_dae import DenoisingConformerDAE, DenoisingTransformerDAE
 from custom_loss import MaximumNegentropyLoss
 
 class CustomLRScheduler(object):
@@ -46,7 +47,8 @@ class LitDAE(pl.LightningModule):
     def __init__(self, config:dict) -> None:        
         super().__init__()
         self.config = config
-        self.model = UNetRadio2D(config)
+        #self.model = UNetRadio2D(config)
+        self.model = DenoisingConformerDAE(**config['conformer'])
         self.negentropy_loss = MaximumNegentropyLoss()
         self.lambda_negentropy = config['lambda_negentropy']
         self.mean=0.

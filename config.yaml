@@ -54,6 +54,15 @@ scheduler:
   mini_batch_size: 64
 
 # model
+conformer:
+  input_dim: 160
+  output_dim: 80
+  seq_len: 256
+  d_model: 256
+  num_heads: 8
+  num_layers: 6
+  conv_kernel_size: 31
+  
 unet:
   #normalize: False
   #floor: False
