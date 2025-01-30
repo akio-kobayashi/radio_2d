@@ -44,7 +44,7 @@ class ConformerBlock(nn.Module):
 
 class DenoisingConformerDAE(nn.Module):
     """Conformer-based Denoising Autoencoder"""
-    def __init__(self, input_dim=80, seq_len=256, d_model=256, num_heads=8, num_layers=6, conv_kernel_size=31):
+    def __init__(self, input_dim=80, output_dim=80, seq_len=256, d_model=256, num_heads=8, num_layers=6, conv_kernel_size=31):
         super().__init__()
         self.embedding = nn.Linear(input_dim, d_model)  # メルスペクトルを埋め込み次元に変換
         self.pos_encoding = nn.Parameter(torch.rand(1, seq_len, d_model))  # 位置エンコーディング
@@ -53,7 +53,7 @@ class DenoisingConformerDAE(nn.Module):
             *[ConformerBlock(d_model, num_heads, conv_kernel_size) for _ in range(num_layers)]
         )
 
-        self.output_layer = nn.Linear(d_model, input_dim)  # 埋め込み次元 → メルスペクトログラム次元
+        self.output_layer = nn.Linear(d_model, output_dim)  # 埋め込み次元 → メルスペクトログラム次元
 
     def forward(self, noisy_mel):
         batch_size, mel_dim, num_frames = noisy_mel.shape  # (B, 80, 256)
@@ -78,7 +78,7 @@ class DenoisingConformerDAE(nn.Module):
         return clean_mel
     
 class DenoisingTransformerDAE(nn.Module):
-    def __init__(self, input_dim=80, seq_len=256, d_model=256, num_heads=8, num_layers=6):
+    def __init__(self, input_dim=80, output_dim=80, seq_len=256, d_model=256, num_heads=8, num_layers=6):
         super(DenoisingTransformerDAE, self).__init__()
 
         self.embedding = nn.Linear(input_dim, d_model)  # メルスペクトル次元 → 埋め込み次元
@@ -89,18 +89,13 @@ class DenoisingTransformerDAE(nn.Module):
             num_layers=num_layers
         )
 
-        self.decoder = nn.TransformerDecoder(
-            nn.TransformerDecoderLayer(d_model=d_model, nhead=num_heads, dim_feedforward=512),
-            num_layers=num_layers
-        )
-
-        self.output_layer = nn.Linear(d_model, input_dim)  # 埋め込み次元 → メルスペクトル次元
+        self.output_layer = nn.Linear(d_model, output_dim)  # 埋め込み次元 → メルスペクトル次元
 
     def forward(self, noisy_mel):
         batch_size, mel_dim, num_frames = noisy_mel.shape  # (B, 80, 256)
 
         # (B, 80, 256) → (B, 256, 80) に転置
-        x = rearrange(noisy_mel, 'b m t -> b t m') #noisy_mel.permute(0, 2, 1)  # 時間方向をシーケンスとする
+        x = rearrange(noisy_mel, 'b m t -> b t m')  # 時間方向をシーケンスとする
 
         # メル次元を Transformer の埋め込み次元 (d_model) に変換
         x = self.embedding(x)  # (B, 256, d_model)
@@ -110,19 +105,19 @@ class DenoisingTransformerDAE(nn.Module):
 
         # Transformer Encoder-Decoder
         x = self.encoder(x)  # (B, 256, d_model)
-        x = self.decoder(x, x)  # (B, 256, d_model)
 
         # (B, 256, d_model) → (B, 256, 80)
         clean_mel = self.output_layer(x)
 
         # 元の形状に戻す (B, 80, 256)
-        clean_mel = rearrange(clean_mel, 'b t m -> b m t') #clean_mel.permute(0, 2, 1)
+        clean_mel = rearrange(clean_mel, 'b t m -> b m t')
         return clean_mel
 
 if __name__ == '__main__':
     config = {
         'conformer': {
-            'input_dim': 80,
+            'input_dim': 160,
+            'output_dim': 80,
             'seq_len': 256,
             'd_model': 256,
             'num_heads': 8,
@@ -130,7 +125,8 @@ if __name__ == '__main__':
             'conv_kernel_size': 31
         },
         'transformer':{
-            'input_dim': 80,
+            'input_dim': 160,
+            'output_dim': 80,
             'seq_len': 256,
             'd_model': 256,
             'num_heads': 8,
