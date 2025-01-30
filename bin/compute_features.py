@@ -13,12 +13,15 @@ warnings.filterwarnings('ignore')
     input_csv format:  key, clean, noisy, 
     output_csv format: key, clean, noisy
 '''
-def compute_features(input_csv, output_csv, output_dir, num_mels):
+def compute_features(input_csv, output_csv, output_dir, num_mels, magnitude):
     keys, cleans, noisys = [], [], []
 
     df = pd.read_csv(input_csv)
     for idx, row in df.iterrows():
-        clean = M.get_mel_spectrogram(row['clean'])
+        if magnitude:
+            clean = M.mag_spectrogram(row['clean'])
+        else:
+            clean = M.get_mel_spectrogram(row['clean'])
         clean_path = os.path.join(output_dir, row['key']+'_clean') + '.pt'
         torch.save(clean, clean_path)
 
@@ -102,9 +105,10 @@ if __name__ == '__main__':
     parser.add_argument('--output_dir', type=str, default='./')
     parser.add_argument('--output_stats', type=str, default='stats.npz')
     parser.add_argument('--num_mels', type=int, default=80)
+    parser.add_argument('--magnitude', action='store_true')
     args=parser.parse_args()
        
-    compute_features(args.input_csv, args.output_csv, args.output_dir, args.num_mels)
+    compute_features(args.input_csv, args.output_csv, args.output_dir, args.num_mels, args.magnitude)
     input_mean, input_var, output_mean, output_var = compute_mean_var(args.output_csv)
     save_mean_var(input_mean, input_var, output_mean, output_var, args.output_stats)
     
