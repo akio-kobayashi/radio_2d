@@ -34,6 +34,8 @@ def spectral_de_normalize_torch(magnitudes):
     return output
 
 def mag_spectrogram(y, n_fft, hop_size, win_size, center=False):
+    #pad_size = max(0, int((n_fft - hop_size) / 2))
+    #y = torch.nn.functional.pad(y.unsqueeze(1), (pad_size, pad_size), mode='reflect')
     y = torch.nn.functional.pad(y.unsqueeze(1), (int((n_fft-hop_size)/2), int((n_fft-hop_size)/2)), mode='reflect')
     y = y.squeeze(1)
 
@@ -93,6 +95,6 @@ def get_mag_spectrogram(path, resample_rate=22050, n_fft=1024,
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu") 
     waveform, sample_rate = torchaudio.load(path)
     resampled_waveform = F.resample(waveform.to(device), sample_rate, resample_rate, lowpass_filter_width=6)
-    spec = mag_spectrogram(resampled_waveform, n_fft, resample_rate, hop_size, win_size)
+    spec = mag_spectrogram(resampled_waveform, n_fft, hop_size, win_size)
 
     return spec

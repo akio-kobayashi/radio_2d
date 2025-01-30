@@ -18,14 +18,14 @@ def compute_features(input_csv, output_csv, output_dir, num_mels, magnitude):
 
     df = pd.read_csv(input_csv)
     for idx, row in df.iterrows():
-        if magnitude:
-            clean = M.mag_spectrogram(row['clean'])
-        else:
-            clean = M.get_mel_spectrogram(row['clean'])
+        clean = M.get_mel_spectrogram(row['clean'], num_mels=num_mels)
         clean_path = os.path.join(output_dir, row['key']+'_clean') + '.pt'
         torch.save(clean, clean_path)
 
-        noisy = M.get_mel_spectrogram(row['noisy'], num_mels=num_mels)
+        if magnitude:
+            noisy = M.get_mag_spectrogram(row['noisy'])
+        else:
+            noisy = M.get_mel_spectrogram(row['noisy'], num_mels=num_mels)
         noisy_path = os.path.join(output_dir, row['key']+'_noisy') + '.pt'
         torch.save(noisy, noisy_path)
         
