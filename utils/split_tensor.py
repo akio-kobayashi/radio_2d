@@ -19,7 +19,7 @@ def split_and_reshape(tensor, n_sample):
     new_batch = new_sample // n_sample
     
     # 形状を変更
-    reshaped_tensor = tensor.view(batch * new_batch, feature, n_sample)
+    reshaped_tensor = tensor.reshape(batch * new_batch, feature, n_sample)
     return reshaped_tensor
 
 def reshape_back(tensor, original_sample_size):
