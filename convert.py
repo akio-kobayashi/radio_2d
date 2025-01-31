@@ -9,6 +9,7 @@ from speech_dataset import SpeechDataset
 import utils.split_tensor as S
 import speech_dataset
 import bin.compute_features as C
+import utils.mel_spectrogram as M
 from einops import rearrange
 from argparse import ArgumentParser
 import yaml
@@ -40,6 +41,7 @@ def main(args, config:dict):
         output = model.forward(split_mel)
         output = S.reshape_back(output, original_length)
         output = output * output_var + output_mean
+        output = M.dynamic_range_decompression_torch(output)
                
         path = os.path.join(args.output_dir, row['key']+'.pt')
         torch.save(output, path)
