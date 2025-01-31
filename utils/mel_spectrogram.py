@@ -43,6 +43,7 @@ def mag_spectrogram(y, n_fft, hop_size, win_size, center=False):
                       center=center, pad_mode='reflect', normalized=False, onesided=True, return_complex=True)
 
     spec = torch.abs(spec) + 1.e-9 
+    spec = spectral_normalize_torch(spec)
 
     return spec[:, 1:, :]
 

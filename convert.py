@@ -41,7 +41,7 @@ def main(args, config:dict):
         output = model.forward(split_mel)
         output = S.reshape_back(output, original_length)
         output = output * output_var + output_mean
-        output = M.dynamic_range_decompression_torch(output)
+        output = M.spectral_de_normalize_torch(output)
                
         path = os.path.join(args.output_dir, row['key']+'.pt')
         torch.save(output, path)
